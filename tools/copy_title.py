@@ -327,6 +327,9 @@ def download_episode(slug_id, num, outdir, start_skip=0):
                 f.write('#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-PLAYLIST-TYPE:VOD\n')
                 f.write(f'#EXT-X-TARGETDURATION:{int(dur) + 1}\n#EXT-X-MEDIA-SEQUENCE:0\n')
                 f.write(f'#EXTINF:{dur:.3f},\nsub-{lang}.vtt\n#EXT-X-ENDLIST\n')
+        # Master MULTIVARIAN SEJATI (revisi 5 Nov 03:0x): playlist.m3u8 menjadi
+        # master yang menunjuk video.m3u8 — pola hybrid (MEDIA di dalam media
+        # playlist) tidak terbaca sebagai trek oleh pemutar di HP user.
         media = ''
         if 'en' in subs:
             media += ('#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",LANGUAGE="en",'
@@ -335,12 +338,15 @@ def download_episode(slug_id, num, outdir, start_skip=0):
             media += ('#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="Indonesian",LANGUAGE="id",'
                       'DEFAULT=NO,AUTOSELECT=YES,URI="subs-id.m3u8"\n')
         p = os.path.join(outdir, 'playlist.m3u8')
-        lines = open(p).read().splitlines(keepends=True)
-        out = []
-        for i, l in enumerate(lines):
-            out.append(l)
-            if i == 0 and l.startswith('#EXTM3U'): out.append(media)
-        open(p, 'w').write(''.join(out))
+        video_text = open(p).read()
+        with open(os.path.join(outdir, 'video.m3u8'), 'w') as f: f.write(video_text)
+        total_bytes = sum(os.path.getsize(os.path.join(outdir, f'chunk-{i:03d}.ts'))
+                          for i in range(len(chunk_durs)))
+        bw = max(500000, int(total_bytes * 8 / max(1.0, dur)))
+        with open(p, 'w') as f:
+            f.write('#EXTM3U\n#EXT-X-VERSION:3\n')
+            f.write(media)
+            f.write(f'#EXT-X-STREAM-INF:BANDWIDTH={bw},SUBTITLES="subs"\nvideo.m3u8\n')
         EP_SUBS[num] = sorted(subs)
         log(f'  ep{num}: subtitle tersalin: {"+".join(sorted(subs))}')
     else:
